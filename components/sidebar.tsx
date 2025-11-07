@@ -87,7 +87,7 @@ export default function Sidebar() {
           {/* ENLACES COMUNES A TODOS */}
           {userRole === 'worker' && (
             <Link
-              href="/c"
+              href="/metrics"
               className={`flex items-center px-4 py-3 text-sm ${isActive("/") ? "bg-green-700 font-medium" : "hover:bg-green-700"
                 } rounded-md mx-2`}
             >
