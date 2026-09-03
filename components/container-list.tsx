@@ -1,84 +1,145 @@
 "use client"
 
-import { Card, CardContent } from "@/components/ui/card"
-import { Trash2, AlertTriangle, CheckCircle } from "lucide-react"
+import { useState } from "react"
+
+type FilterOption = 'all' | 'critical' | 'medium' | 'low'
+
+const CRITICAL_THRESHOLD = 80
+const MEDIUM_THRESHOLD = 50
 
 interface Container {
-  id: string
+  guid: string
+  capacity: number
+  status: 'active' | 'inactive'
   name: string
-  location: { lat: number; lng: number }
-  fillLevel: number
-  type: string
-  lastCollection: string
+  isFavorite: boolean
+  limit: number
+  latitude: string
+  longitude: string
+  lastUpdatedClient?: string
 }
 
 interface ContainerListProps {
   containers: Container[]
-  onSelectContainer: (container: Container) => void
-  selectedContainer: Container | null
 }
 
-export default function ContainerList({ containers, onSelectContainer, selectedContainer }: ContainerListProps) {
-  // Ordenar contenedores por nivel de llenado (descendente)
-  const sortedContainers = [...containers].sort((a, b) => b.fillLevel - a.fillLevel)
+function computeFillLevel(container: Container): number {
+  if (!container.limit || container.limit === 0) return 0
+  const level = (container.capacity / container.limit) * 100
+  return isNaN(level) ? 0 : level
+}
+
+function getFillLevelColor(fillLevel: number): string {
+  if (fillLevel > CRITICAL_THRESHOLD) return "bg-red-500"
+  if (fillLevel >= MEDIUM_THRESHOLD) return "bg-yellow-500"
+  return "bg-green-500"
+}
+
+function applyFilter(containers: Container[], filter: FilterOption): Container[] {
+  return containers.filter((container) => {
+    const fillLevel = computeFillLevel(container)
+    switch (filter) {
+      case 'critical':
+        return fillLevel > CRITICAL_THRESHOLD
+      case 'medium':
+        return fillLevel >= MEDIUM_THRESHOLD && fillLevel <= CRITICAL_THRESHOLD
+      case 'low':
+        return fillLevel < MEDIUM_THRESHOLD
+      default:
+        return true
+    }
+  })
+}
+
+const filterOptions: { value: FilterOption; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'critical', label: 'Critical' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'low', label: 'Low' },
+]
+
+export default function ContainerList({ containers }: ContainerListProps) {
+  const [activeFilter, setActiveFilter] = useState<FilterOption>('all')
+
+  const displayedContainers = applyFilter(containers, activeFilter).sort(
+    (a, b) => computeFillLevel(b) - computeFillLevel(a)
+  )
+
+  const emptyMessage =
+    activeFilter === 'all'
+      ? 'No containers found'
+      : `No ${activeFilter} containers found`
 
   return (
-    <div className="space-y-3">
-      {containers.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">No se encontraron contenedores</div>
-      ) : (
-        sortedContainers.map((container) => (
-          <Card
-            key={container.id}
-            className={`cursor-pointer transition-all ${
-              selectedContainer?.id === container.id ? "border-green-500 shadow-md" : "hover:border-gray-300"
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="flex flex-wrap gap-2 p-4 border-b border-gray-200">
+        {filterOptions.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setActiveFilter(value)}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeFilter === value
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
-            onClick={() => onSelectContainer(container)}
           >
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start space-x-3">
-                  <div
-                    className={`p-2 rounded-full ${
-                      container.fillLevel > 80
-                        ? "bg-red-100 text-red-600"
-                        : container.fillLevel > 50
-                          ? "bg-yellow-100 text-yellow-600"
-                          : "bg-green-100 text-green-600"
-                    }`}
-                  >
-                    {container.fillLevel > 80 ? (
-                      <AlertTriangle className="h-5 w-5" />
-                    ) : container.fillLevel > 50 ? (
-                      <Trash2 className="h-5 w-5" />
-                    ) : (
-                      <CheckCircle className="h-5 w-5" />
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {displayedContainers.length === 0 ? (
+        <div className="flex items-center justify-center py-12">
+          <p className="text-gray-500">{emptyMessage}</p>
+        </div>
+      ) : (
+        <ul className="divide-y divide-gray-200">
+          {displayedContainers.map((container) => {
+            const fillLevel = computeFillLevel(container)
+            const colorClass = getFillLevelColor(fillLevel)
+            const clampedLevel = Math.min(Math.max(fillLevel, 0), 100)
+            return (
+              <li key={container.guid} className="p-4 hover:bg-gray-50">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-900 truncate">{container.name}</p>
+                    <p className="text-sm text-gray-500 truncate">{container.guid}</p>
+                    {container.lastUpdatedClient && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Updated: {container.lastUpdatedClient}
+                      </p>
                     )}
                   </div>
-                  <div>
-                    <h3 className="font-medium">{container.name}</h3>
-                    <p className="text-sm text-gray-500">{container.type}</p>
-                    <div className="flex items-center mt-2">
+
+                  <div className="flex items-center gap-6 shrink-0">
+                    <div className="w-36">
+                      <div className="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>Fill level</span>
+                        <span>{Math.round(fillLevel)}%</span>
+                      </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full ${
-                            container.fillLevel > 80
-                              ? "bg-red-600"
-                              : container.fillLevel > 50
-                                ? "bg-yellow-500"
-                                : "bg-green-600"
-                          }`}
-                          style={{ width: `${container.fillLevel}%` }}
-                        ></div>
+                          className={`h-2 rounded-full ${colorClass}`}
+                          style={{ width: `${clampedLevel}%` }}
+                        />
                       </div>
-                      <span className="text-xs font-medium ml-2">{container.fillLevel}%</span>
                     </div>
+
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        container.status === 'active'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}
+                    >
+                      {container.status}
+                    </span>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))
+              </li>
+            )
+          })}
+        </ul>
       )}
     </div>
   )
