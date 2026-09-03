@@ -1,14 +1,12 @@
 export interface Container {
-    
-  
-        "guid": string,
-        "name": string,
-        "latitude": string,
-        "longitude": string,
-        "capacity": number,
-        "status": string,
-        "isFavorite": boolean,
-        "limit": number,
-
+    guid: string;
+    capacity: number;
+    status: 'active' | 'inactive';
+    name: string;
+    isFavorite: boolean;
+    limit: number;
+    latitude: string;
+    longitude: string;
 }
-    
+
+export type ContainerPayload = Omit<Container, 'guid'>;
